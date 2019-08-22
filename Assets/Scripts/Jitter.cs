@@ -13,6 +13,7 @@ public class Jitter : MonoBehaviour {
     public Vector4 currentSample = Vector4.zero;
     private int currentIndex = -2;
 
+    // gets a point from the halton sequence at the given index
     private static float haltonSequence(int _index, int _base)
     {
         float f = 1.0f;
@@ -28,6 +29,8 @@ public class Jitter : MonoBehaviour {
         return r;
     }
 
+    // generates the sample distribution and assigns it to the given array 
+    // even indices are x positions, odd are y
     private static void generateSampleDistribution(float[] haltonArray)
     {
         for(int i = 0, n = haltonArray.Length / 2; i != n; ++i )
@@ -42,6 +45,9 @@ public class Jitter : MonoBehaviour {
     // Before camera culls the scene
     void OnPreCull()
     {
+        // turn off vsync
+        QualitySettings.vSyncCount = 0;
+
         // update jitter
         {
             if (currentIndex == -2)
@@ -56,7 +62,6 @@ public class Jitter : MonoBehaviour {
                 currentIndex += 1;
                 currentIndex %= halton.Length / 2;
 
-                /// NOTE the below declaration and assignment of n and i seem redundant, can tidy up fetching of sample with a function later
                 Vector2 sample;
                 int n = halton.Length / 2;
                 int i = currentIndex % n;

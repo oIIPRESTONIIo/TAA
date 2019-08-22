@@ -1,4 +1,7 @@
-﻿/// TODO: Cite this code as per guidelines, futher than simply imcluding the copyright notice at the top
+﻿/// @brief Useful extensions for Vector and Camera types
+/// Modified from :-
+/// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
+/// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Scripts/Extensions.cs".
 
 
 // Copyright (c) <2015> <Playdead>

@@ -1,3 +1,8 @@
+/// @brief A camera control system for use in Unity's play mode. This has been modified to use a different control scheme.
+/// Modified from :-
+/// windexglow (June 18, 2010). Fly Cam (simple cam script).
+/// [Accessed 2019]. Available from: "https://forum.unity.com/threads/fly-cam-simple-cam-script.67042/".
+
 using UnityEngine;
 using System.Collections;
 
@@ -14,7 +19,7 @@ public class CameraControl : MonoBehaviour
     space : Moves camera on X and Z axis only.  So camera doesn't gain any height*/
 
 
-    float mainSpeed = 2.0f; //regular speed
+    float mainSpeed = 10f; //regular speed
     float camSens = 0.25f; //How sensitive it with mouse
     private Vector3 lastMouse = new Vector3(255, 255, 255); //kind of in the middle of the screen, rather than at the top (play)
     private float totalRun = 1.0f;

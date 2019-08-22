@@ -1,15 +1,11 @@
-﻿// Copyright (c) <2015> <Playdead>
-// This file is subject to the MIT License as seen in the root of this folder structure (LICENSE.TXT)
-// AUTHOR: Lasse Jon Fuglsang Pedersen <lasse@playdead.com>
-
-Shader "Velocity"
+﻿Shader "Velocity"
 {
 	CGINCLUDE
 
 	#include "UnityCG.cginc"
 
 	uniform sampler2D_half velocityTexture;
-	uniform float4 velocityTexture_TexelSize; // Is automaitcally assigned by Unity, apparently
+	uniform float4 velocityTexture_TexelSize; // Is automatically assigned by Unity, apparently
 
 	uniform sampler2D_float depthTexture;
 
@@ -55,10 +51,9 @@ Shader "Velocity"
 		float2 previousNDC = previousClipSpacePosition.xy / previousClipSpacePosition.w;
 		float2 previousScreenSpacePosition = 0.5 * previousNDC + 0.5;
 
-		// estimate velocity
+		// velcoity = difference
 		float2 velocity = IN.texCoords - previousScreenSpacePosition;
 
-		// output
 		return float4(velocity, 0.0, 0.0);
 	}
 

@@ -17,6 +17,7 @@ public class TemporalReprojection : MonoBehaviour
     [Range(0.0f, 1.0f)] public float blendWeightMin = 0.85f;
     [Range(0.0f, 1.0f)] public float blendWeightMax = 0.95f;
 
+    public bool showVelocity = false;
     public float motionBlurStrength = 1.0f;
 
     void Reset()
@@ -38,8 +39,6 @@ public class TemporalReprojection : MonoBehaviour
 
     void Resolve(RenderTexture source, RenderTexture target)
     {
-        //EnsureArray(ref reprojectionBuffer, 2);
-
         if (reprojectionMaterial == null)
         {
             reprojectionMaterial = new Material(reprojectionShader);
@@ -59,14 +58,10 @@ public class TemporalReprojection : MonoBehaviour
         if (reprojectionBuffer[0] == null)
         {
             reprojectionBuffer[0] = RenderTexture.GetTemporary(source.width, source.height, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 1);
-            reprojectionBuffer[0].filterMode = FilterMode.Point;
-            reprojectionBuffer[0].wrapMode = TextureWrapMode.Clamp;
         }
         if (reprojectionBuffer[1] == null)
         {
             reprojectionBuffer[1] = RenderTexture.GetTemporary(source.width, source.height, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 1);
-            reprojectionBuffer[1].filterMode = FilterMode.Point;
-            reprojectionBuffer[1].wrapMode = TextureWrapMode.Clamp;
         }
 
         if (reprojectionIndex == -1)
@@ -86,6 +81,7 @@ public class TemporalReprojection : MonoBehaviour
         currentJitter.y /= source.height;
         currentJitter.w /= source.height;
 
+        // set uniforms
         reprojectionMaterial.SetTexture("mainTexture", source);
         reprojectionMaterial.SetTexture("historyTexture", reprojectionBuffer[indexRead]);
         reprojectionMaterial.SetTexture("velocityBuffer", velocityBuffer.activeVelocityBuffer);
@@ -93,25 +89,29 @@ public class TemporalReprojection : MonoBehaviour
         reprojectionMaterial.SetFloat("blendWeightMin", blendWeightMin);
         reprojectionMaterial.SetFloat("blendWeightMax", blendWeightMax);
         reprojectionMaterial.SetFloat("motionBlurStrength", motionBlurStrength);
-
-        // reproject frame n-1 into output + history buffer
+        if(showVelocity)
         {
-            renderTargets[0] = reprojectionBuffer[indexWrite].colorBuffer;
-            renderTargets[1] = target.colorBuffer;
-
-            Graphics.SetRenderTarget(renderTargets, source.depthBuffer);
-            reprojectionMaterial.SetPass(0);
-            reprojectionBuffer[indexWrite].DiscardContents();
-
-            DrawFullscreenQuad();
-
-            reprojectionIndex = indexWrite;
+            reprojectionMaterial.EnableKeyword("SHOW_VELOCITY");
+        } else {
+            reprojectionMaterial.DisableKeyword("SHOW_VELOCITY");
         }
+
+        // copy to history buffer
+        renderTargets[0] = reprojectionBuffer[indexWrite].colorBuffer;
+        renderTargets[1] = target.colorBuffer;
+
+        Graphics.SetRenderTarget(renderTargets, source.depthBuffer);
+        reprojectionMaterial.SetPass(0);
+        reprojectionBuffer[indexWrite].DiscardContents();
+
+        DrawFullscreenQuad();
+
+        reprojectionIndex = indexWrite;
     }
 
     void OnRenderImage(RenderTexture source, RenderTexture target)
     {
-        if (target != null)// resolve without additional blit when not end of chain
+        if (target != null)
         {
             Resolve(source, target);
         }
@@ -136,7 +136,10 @@ public class TemporalReprojection : MonoBehaviour
         RenderTexture.ReleaseTemporary(reprojectionBuffer[1]);
     }
 
-    /// NOTE: Cite Pedersen
+    /// @brief Renders a full-screen quad
+    /// Modified from :-
+    /// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
+    /// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Scripts/EffectBase.cs".
 
     public void DrawFullscreenQuad()
     {
@@ -159,4 +162,6 @@ public class TemporalReprojection : MonoBehaviour
         GL.End();
         GL.PopMatrix();
     }
+
+    /// end of citation
 }

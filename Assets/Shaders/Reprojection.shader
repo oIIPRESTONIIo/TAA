@@ -9,6 +9,8 @@
 
 	#include "UnityCG.cginc"
 
+	#pragma multi_compile __ SHOW_VELOCITY
+
 	uniform float4 jitter; // frustum jitter uv deltas, where xy = current frame, zw = previous
 
 	uniform sampler2D mainTexture;
@@ -21,8 +23,10 @@
 	uniform float blendWeightMax;
 	uniform float motionBlurStrength;
 
-	uniform sampler2D_float _CameraDepthTexture;
-	uniform float4 _CameraDepthTexture_TexelSize;
+	uniform sampler2D_float cameraDepthTexture;
+	uniform float4 cameraDepthTexture_TexelSize;
+
+	uniform bool showVelocity;
 
 	struct v2f
 	{
@@ -42,44 +46,9 @@
 		return OUT;
 	}
 
-	/// NOTE: Cite Pedersen (specifically from IncDepth.cginc)
-	float3 find_closest_fragment_3x3(float2 uv)
-	{
-		float2 dd = abs(_CameraDepthTexture_TexelSize.xy);
-		float2 du = float2(dd.x, 0.0);
-		float2 dv = float2(0.0, dd.y);
-
-		float3 dtl = float3(-1, -1, tex2D(_CameraDepthTexture, uv - dv - du).x);
-		float3 dtc = float3(0, -1, tex2D(_CameraDepthTexture, uv - dv).x);
-		float3 dtr = float3(1, -1, tex2D(_CameraDepthTexture, uv - dv + du).x);
-
-		float3 dml = float3(-1, 0, tex2D(_CameraDepthTexture, uv - du).x);
-		float3 dmc = float3(0, 0, tex2D(_CameraDepthTexture, uv).x);
-		float3 dmr = float3(1, 0, tex2D(_CameraDepthTexture, uv + du).x);
-
-		float3 dbl = float3(-1, 1, tex2D(_CameraDepthTexture, uv + dv - du).x);
-		float3 dbc = float3(0, 1, tex2D(_CameraDepthTexture, uv + dv).x);
-		float3 dbr = float3(1, 1, tex2D(_CameraDepthTexture, uv + dv + du).x);
-
-		float3 dmin = dtl;
-		if (dmin.z < dtc.z) dmin = dtc;
-		if (dmin.z < dtr.z) dmin = dtr;
-
-		if (dmin.z < dml.z) dmin = dml;
-		if (dmin.z < dmc.z) dmin = dmc;
-		if (dmin.z < dmr.z) dmin = dmr;
-
-		if (dmin.z < dbl.z) dmin = dbl;
-		if (dmin.z < dbc.z) dmin = dbc;
-		if (dmin.z < dbr.z) dmin = dbr;
-
-		return float3(uv + dd.xy * dmin.xy, dmin.z);
-	}
-
-	/// NOTE: Cite Pedersen (modified from)
+	// clip colour to bounding box
 	float4 clipColour(float3 minBound, float3 maxBound, float4 neighbourAverage, float4 historyColour)
 	{
-		// note: only clips towards aabb center (but fast!)
 		float3 maxClipBound = 0.5 * (maxBound + minBound);
 		float3 minClipBound = 0.5 * (maxBound - minBound);
 
@@ -92,13 +61,12 @@
 		{
 			return float4(maxClipBound, neighbourAverage.w) + colourClipSpace / maxColourValue;
 		} else {
-			return historyColour;// point inside aabb
+			return historyColour;
 		}
 	}
 
 	float4 reproject(float2 texCoords, float2 screenSpaceVelocity, float depth)
 	{
-		// read texels
 		float4 screenColour = tex2D(mainTexture, texCoords - jitter.xy);
 		float4 historyColour = tex2D(historyTexture, texCoords - screenSpaceVelocity);
 		float2 uv = texCoords;
@@ -147,6 +115,40 @@
 		return lerp(screenColour, historyColour, feedbackWeight);
 	}
 
+	float3 find_closest_fragment_3x3(float2 uv)
+	{
+		float2 dd = abs(cameraDepthTexture_TexelSize.xy);
+		float2 du = float2(dd.x, 0.0);
+		float2 dv = float2(0.0, dd.y);
+
+		float3 dtl = float3(-1, -1, tex2D(cameraDepthTexture, uv - dv - du).x);
+		float3 dtc = float3(0, -1, tex2D(cameraDepthTexture, uv - dv).x);
+		float3 dtr = float3(1, -1, tex2D(cameraDepthTexture, uv - dv + du).x);
+
+		float3 dml = float3(-1, 0, tex2D(cameraDepthTexture, uv - du).x);
+		float3 dmc = float3(0, 0, tex2D(cameraDepthTexture, uv).x);
+		float3 dmr = float3(1, 0, tex2D(cameraDepthTexture, uv + du).x);
+
+		float3 dbl = float3(-1, 1, tex2D(cameraDepthTexture, uv + dv - du).x);
+		float3 dbc = float3(0, 1, tex2D(cameraDepthTexture, uv + dv).x);
+		float3 dbr = float3(1, 1, tex2D(cameraDepthTexture, uv + dv + du).x);
+
+		float3 dmin = dtl;
+		if (dmin.z < dtc.z) dmin = dtc;
+		if (dmin.z < dtr.z) dmin = dtr;
+
+		if (dmin.z < dml.z) dmin = dml;
+		if (dmin.z < dmc.z) dmin = dmc;
+		if (dmin.z < dmr.z) dmin = dmr;
+
+		if (dmin.z < dbl.z) dmin = dbl;
+		if (dmin.z < dbc.z) dmin = dbc;
+		if (dmin.z < dbr.z) dmin = dbr;
+
+		return float3(uv + dd.xy * dmin.xy, dmin.z);
+	}
+
+
 	struct f2rt
 	{
 		fixed4 buffer : SV_Target0;
@@ -158,38 +160,41 @@
 		f2rt OUT;
 		float2 uv = IN.texCoords;
 
-		// retrieve closest fragment in a 3x3 neighbourhood
+		// retrieve closest fragment in a 3x3 neighbourhood;
 		float3 closestFragment = find_closest_fragment_3x3(uv);
 		float2 screenSpaceVelocity = tex2D(velocityBuffer, closestFragment.xy).xy;
-		float depth = LinearEyeDepth(closestFragment.z);
+		float depth = LinearEyeDepth(tex2D(cameraDepthTexture, closestFragment).z);
 
 		// temporal resolve
 		float4 screenColour = reproject(IN.texCoords, screenSpaceVelocity, depth);
 
 		// prepare outputs
 		float4 bufferColour = screenColour;
-		
+
 		//motion blur
 		screenSpaceVelocity = motionBlurStrength * screenSpaceVelocity;
 		float velocityMagnitude = length(screenSpaceVelocity * mainTexture_TexelSize.zw) / 2;
-		float trustLowerBound = 1.0;
+		float trustLowerBound = 2.5;
 		float trustUpperBound = 15.0;
 		float trustSpan = trustUpperBound - trustLowerBound;
 		float trust = 1.0 - clamp(velocityMagnitude - trustLowerBound, 0.0, trustSpan) / trustSpan;
 
-		/// NOTE: Cite Pedersen
 		float2 unijitteredUV = IN.texCoords - jitter.xy;
 		float2 velocity = 0.5 * screenSpaceVelocity;
-		int taps = 3;
+		int samples = 5;
 
+		/// @brief implements motion blur, with the addition of noise (which adds a surprising difference in quality)
+		/// Modified from :-
+		/// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
+		/// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Shaders/TemporalReprojection.shader".
 		float srand = frac(sin(dot((unijitteredUV + _SinTime.xx).xy, float2(12.9898f, 78.233f)))* 43758.5453f);
-		float2 vtap = velocity / taps;
+		float2 vtap = velocity / samples;
 		float2 pos0 = unijitteredUV + vtap * (0.5 * srand);
 		float4 accu = 0.0;
 		float wsum = 0.0;
 
 		[unroll]
-		for (int i = -taps; i <= taps; i++)
+		for (int i = 0; i <= samples; i++)
 		{
 			accu += 1 * tex2D(mainTexture, pos0 + i * vtap);
 			wsum += 1;
@@ -197,12 +202,18 @@
 
 		screenColour = lerp((accu / wsum), screenColour, trust);
 
+
+#if SHOW_VELOCITY
 		// display velocity
-		//screenColour.g += 25 * length(screenSpaceVelocity);
-		//screenColour = float4(25 * abs(screenSpaceVelocity), 0.0, 0.0);
+		screenColour.g += 25 * length(screenSpaceVelocity);
+		screenColour = float4(25 * abs(screenSpaceVelocity), 0.0, 0.0);
+#endif
 
 		// add noise
-		/// NOTE: Cite Pedersen
+		/// @brief adds noise to the final colour output (similar quality results to the motion blur)
+		/// Modified from :-
+		/// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
+		/// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Shaders/TemporalReprojection.shader".
 		float4 noise4 = frac(sin(dot((IN.texCoords + _SinTime.x + 0.6959174).xy, float2(12.9898f, 78.233f)))* float4(43758.5453f, 28001.8384f, 50849.4141f, 12996.89f)) / 510.0f;
 		OUT.buffer = saturate(bufferColour + noise4);
 		OUT.screen = saturate(screenColour + noise4);

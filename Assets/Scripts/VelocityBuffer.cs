@@ -42,8 +42,6 @@ public class VelocityBuffer : MonoBehaviour
         if (velocityBuffer == null)
         {
             velocityBuffer = RenderTexture.GetTemporary(sceneCamera.pixelWidth, sceneCamera.pixelHeight, 16, RenderTextureFormat.RGFloat, RenderTextureReadWrite.Default, 1);
-            velocityBuffer.filterMode = FilterMode.Point;
-            velocityBuffer.wrapMode = TextureWrapMode.Clamp;
         }
 
         Matrix4x4 currentViewMat = sceneCamera.worldToCameraMatrix;
@@ -62,6 +60,7 @@ public class VelocityBuffer : MonoBehaviour
             velocityTexture.hideFlags = HideFlags.DontSave; // object will not be saved to scene, will not be destroyed on new scene
         }
 
+        // set uniforms
         velocityTexture.SetMatrix("currentViewMat", previousViewMat);
         velocityTexture.SetMatrix("currentViewProjectMat", currentProjectionMat * currentViewMat);
         velocityTexture.SetMatrix("previousViewProjectMat", currentProjectionMat * previousViewMat);
@@ -78,11 +77,14 @@ public class VelocityBuffer : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        RenderTexture.ReleaseTemporary(velocityBuffer); // manually release velocity bugger
+        RenderTexture.ReleaseTemporary(velocityBuffer); // manually release velocity buffer
     }
 
 
-    /// NOTE: Cite Pedersen
+    /// @brief Renders a full-screen quad
+    /// Modified from :-
+    /// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
+    /// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Scripts/EffectBase.cs".
 
     public void DrawFullscreenQuad()
     {
@@ -105,4 +107,5 @@ public class VelocityBuffer : MonoBehaviour
         GL.End();
         GL.PopMatrix();
     }
+    /// end of citation
 }
