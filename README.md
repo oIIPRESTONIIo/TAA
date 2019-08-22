@@ -2,7 +2,7 @@
 
 A implementation of temporal anti-aliasing in Unity.
 
-Included in the Unity project are two scenes, a simple cube, and a fabrication of a city block downloaded from the Unity asset store for surther demonstrtive purposes("NYC Block #6" by NONECG).
+Included in the Unity project are two scenes, a simple cube, and a fabrication of a city block downloaded from the Unity asset store for further demonstrtive purposes("NYC Block #6" by NONECG).
 
 When startting play mode the camera tends to have a mind of it's own as to where it faces initially, however you can control the view direction with the mouse. 
 Additionally, there is a known issue when translating the camera and the motion vectors, resulting in some awful ghosting. 
