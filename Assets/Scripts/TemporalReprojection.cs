@@ -71,9 +71,9 @@ public class TemporalReprojection : MonoBehaviour
             Graphics.Blit(source, reprojectionBuffer[reprojectionIndex]);
         }
 
-        int indexRead = reprojectionIndex;
+        int readIndex = reprojectionIndex;
         // ensure the write index is the opposite of the read
-        int indexWrite = (reprojectionIndex + 1) % 2;
+        int writeIndex = (reprojectionIndex + 1) % 2;
 
         Vector4 currentJitter = jitter.currentSample;
         currentJitter.x /= source.width;
@@ -83,7 +83,7 @@ public class TemporalReprojection : MonoBehaviour
 
         // set uniforms
         reprojectionMaterial.SetTexture("mainTexture", source);
-        reprojectionMaterial.SetTexture("historyTexture", reprojectionBuffer[indexRead]);
+        reprojectionMaterial.SetTexture("historyTexture", reprojectionBuffer[readIndex]);
         reprojectionMaterial.SetTexture("velocityBuffer", velocityBuffer.activeVelocityBuffer);
         reprojectionMaterial.SetVector("jitter", currentJitter);
         reprojectionMaterial.SetFloat("blendWeightMin", blendWeightMin);
@@ -97,16 +97,16 @@ public class TemporalReprojection : MonoBehaviour
         }
 
         // copy to history buffer
-        renderTargets[0] = reprojectionBuffer[indexWrite].colorBuffer;
+        renderTargets[0] = reprojectionBuffer[writeIndex].colorBuffer;
         renderTargets[1] = target.colorBuffer;
 
         Graphics.SetRenderTarget(renderTargets, source.depthBuffer);
         reprojectionMaterial.SetPass(0);
-        reprojectionBuffer[indexWrite].DiscardContents();
+        reprojectionBuffer[writeIndex].DiscardContents();
 
         DrawFullscreenQuad();
 
-        reprojectionIndex = indexWrite;
+        reprojectionIndex = writeIndex;
     }
 
     void OnRenderImage(RenderTexture source, RenderTexture target)

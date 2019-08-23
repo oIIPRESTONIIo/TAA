@@ -106,9 +106,8 @@
 		// feedback weight from unbiased luminance diff (t.lottes)
 		float lum0 = Luminance(screenColour.rgb);
 		float lum1 = Luminance(historyColour.rgb);
-		float difference = abs(lum0 - lum1) / max(lum0, max(lum1, 0.2));
+		float difference = abs(lum0 - lum1);
 		float weight = 1.0 - difference;
-		weight *= weight;
 		float feedbackWeight = lerp(blendWeightMin, blendWeightMax, weight);
 
 		// output
@@ -183,24 +182,17 @@
 		float2 velocity = 0.5 * screenSpaceVelocity;
 		int samples = 5;
 
-		/// @brief implements motion blur, with the addition of noise (which adds a surprising difference in quality)
-		/// Modified from :-
-		/// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
-		/// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Shaders/TemporalReprojection.shader".
-		float srand = frac(sin(dot((unijitteredUV + _SinTime.xx).xy, float2(12.9898f, 78.233f)))* 43758.5453f);
-		float2 vtap = velocity / samples;
-		float2 pos0 = unijitteredUV + vtap * (0.5 * srand);
-		float4 accu = 0.0;
-		float wsum = 0.0;
+		float2 velocityStep = velocity / samples;
+		float2 UVpos = unijitteredUV + velocityStep;
+		float4 accumilation = 0.0;
 
 		[unroll]
-		for (int i = 0; i <= samples; i++)
+		for (int i = 0; i < samples; i++)
 		{
-			accu += 1 * tex2D(mainTexture, pos0 + i * vtap);
-			wsum += 1;
+			accumilation += tex2D(mainTexture, UVpos + i * velocityStep);
 		}
 
-		screenColour = lerp((accu / wsum), screenColour, trust);
+		screenColour = lerp((accumilation / samples), screenColour, trust);
 
 
 #if SHOW_VELOCITY
@@ -209,12 +201,12 @@
 		screenColour = float4(25 * abs(screenSpaceVelocity), 0.0, 0.0);
 #endif
 
-		// add noise
-		/// @brief adds noise to the final colour output (similar quality results to the motion blur)
+		/// @brief adds noise to the final colour output (which adds a surprising uplift in quality)
 		/// Modified from :-
 		/// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
 		/// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Shaders/TemporalReprojection.shader".
 		float4 noise4 = frac(sin(dot((IN.texCoords + _SinTime.x + 0.6959174).xy, float2(12.9898f, 78.233f)))* float4(43758.5453f, 28001.8384f, 50849.4141f, 12996.89f)) / 510.0f;
+		/// end citation
 		OUT.buffer = saturate(bufferColour + noise4);
 		OUT.screen = saturate(screenColour + noise4);
 
