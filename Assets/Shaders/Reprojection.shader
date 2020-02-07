@@ -5,15 +5,21 @@
 		mainTexture("Base (RGB)", 2D) = "white" {}
 	}
 
-		CGINCLUDE
+	CGINCLUDE
 
-#pragma multi_compile __ SHOW_VELOCITY
-#pragma multi_compile __ SHOW_DEPTH
-#pragma multi_compile __ MOTION_BLUR
-#pragma multi_compile __ ADD_NOISE
-#pragma multi_compile __ CLIP_HISTORY
+	#pragma multi_compile __ SHOW_VELOCITY
+	#pragma multi_compile __ SHOW_DEPTH
+	#pragma multi_compile __ MOTION_BLUR
+	#pragma multi_compile __ ADD_NOISE
+	#pragma multi_compile __ CLIP_HISTORY
 
-#include "UnityCG.cginc"
+	#if UNITY_REVERSED_Z
+	#define compareGreater(a, b) (a < b)
+	#else
+	#define compareGreater(a, b) (a > b)
+	#endif
+
+	#include "UnityCG.cginc"
 
 	uniform float4 jitter; // frustum jitter uv deltas, where xy = current frame, zw = previous
 
@@ -49,10 +55,9 @@
 
 	// clip colour to bounding box
 	float4 clipColour(float3 minBound, float3 maxBound, float4 neighbourAverage, float4 historyColour)
-	{		
+	{
 		float3 maxClipBound = 0.5 * (maxBound + minBound);
 		float3 minClipBound = 0.5 * (maxBound - minBound) + 0.00000001;
-
 		float4 colourClipSpace = historyColour - float4(maxClipBound, neighbourAverage.w);
 		float3 colourUnitSpace = colourClipSpace.xyz / minClipBound;
 		colourUnitSpace = abs(colourUnitSpace);
@@ -94,15 +99,6 @@
 
 		float4 cavg = (c00 + c01 + c02 + c10 + c11 + c12 + c20 + c21 + c22) / 9.0;
 
-		// minimum and maximum values of 5-tap '+' pattern
-		float4 cmin5 = min(c01, min(c10, min(c11, min(c12, c21))));
-		float4 cmax5 = max(c01, max(c10, max(c11, max(c12, c21))));
-		float4 cavg5 = (c01 + c10 + c11 + c12 + c21) / 5.0;
-
-		cmin = 0.5 * (cmin + cmin5);
-		cmax = 0.5 * (cmax + cmax5);
-		cavg = 0.5 * (cavg + cavg5);
-
 #if CLIP_HISTORY
 		// clip history to neighbourhood of current sample
 		historyColour = clipColour(cmin.xyz, cmax.xyz, clamp(cavg, cmin, cmax), historyColour);
@@ -140,16 +136,16 @@
 		float3 dbr = float3(1, 1, tex2D(_CameraDepthTexture, uv + dv + du).x);
 
 		float3 dmin = dtl;
-		if (dmin.z < dtc.z) dmin = dtc;
-		if (dmin.z < dtr.z) dmin = dtr;
+		if (compareGreater(dmin.z, dtc.z)) dmin = dtc;
+		if (compareGreater(dmin.z, dtr.z)) dmin = dtr;
 
-		if (dmin.z < dml.z) dmin = dml;
-		if (dmin.z < dmc.z) dmin = dmc;
-		if (dmin.z < dmr.z) dmin = dmr;
+		if (compareGreater(dmin.z, dml.z)) dmin = dml;
+		if (compareGreater(dmin.z, dmc.z)) dmin = dmc;
+		if (compareGreater(dmin.z, dmr.z)) dmin = dmr;
 
-		if (dmin.z < dbl.z) dmin = dbl;
-		if (dmin.z < dbc.z) dmin = dbc;
-		if (dmin.z > dbr.z) dmin = dbr;
+		if (compareGreater(dmin.z, dbl.z)) dmin = dbl;
+		if (compareGreater(dmin.z, dbc.z)) dmin = dbc;
+		if (compareGreater(dmin.z, dbr.z)) dmin = dbr;
 
 		return float3(uv + dd.xy * dmin.xy, dmin.z);
 	}
@@ -216,7 +212,7 @@
 
 #if SHOW_DEPTH
 		// display depth
-		outScreen = depth / 100;
+		outScreen = depth / 50;
 #endif
 
 
