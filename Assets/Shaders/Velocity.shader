@@ -7,7 +7,7 @@
 	uniform sampler2D_half velocityTexture;
 	uniform float4 velocityTexture_TexelSize; // Is automatically assigned by Unity, apparently
 
-	uniform sampler2D_float depthTexture;
+	uniform sampler2D_float _CameraDepthTexture;
 
 	uniform float4 projectionExtents;// xy = frustum extents at distance 1, zw = jitter at distance 1
 
@@ -42,7 +42,7 @@
 	float4 frag(v2f IN) : SV_Target
 	{
 		// reconstruct world space position
-		float depth = LinearEyeDepth(tex2D(depthTexture, IN.texCoords).x);
+		float depth = LinearEyeDepth(tex2D(_CameraDepthTexture, IN.texCoords).x);
 		float3 viewSpacePos = float3(IN.viewRay, 1.0) * depth;
 		float4 worldSpacePos = mul(unity_CameraToWorld, float4(viewSpacePos, 1.0));
 

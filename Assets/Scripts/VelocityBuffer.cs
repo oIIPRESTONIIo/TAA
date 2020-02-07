@@ -4,22 +4,36 @@ using UnityEngine;
 [RequireComponent(typeof(Camera), typeof(Jitter))]
 public class VelocityBuffer : MonoBehaviour
 {
-    private Camera sceneCamera;
+    private Camera _camera;
     private Jitter jitter;
 
     public Shader velocityShader;
     private Material velocityTexture;
     private RenderTexture velocityBuffer;
 
-    private Matrix4x4 previousViewMat;
+    private Vector4 projectionExtents;
+    private Matrix4x4 currentViewMat;
+    private Matrix4x4 currentViewProjectionMat;
+    private Matrix4x4 previousViewProjectionMat;
+    private Matrix4x4 previousViewProjectionMat_NoFlip;
+    private bool initParams = false;
 
     public RenderTexture activeVelocityBuffer { get { return velocityBuffer; } }
 
     private float nextFrame;
 
+    void Start()
+    {
+        _camera = Camera.main;
+        if(!_camera.enabled)
+        {
+            _camera.enabled = true;
+        }
+    }
+
     void Reset()
     {
-        sceneCamera = GetComponent<Camera>();
+        _camera = GetComponent<Camera>();
         jitter = GetComponent<Jitter>();
     }
 
@@ -30,23 +44,38 @@ public class VelocityBuffer : MonoBehaviour
 
     void OnPreRender()
     {
-        if ((sceneCamera.depthTextureMode & DepthTextureMode.Depth) == 0)
+        if ((_camera.depthTextureMode & DepthTextureMode.Depth) == 0)
         {
-            sceneCamera.depthTextureMode |= DepthTextureMode.Depth;
+            _camera.depthTextureMode |= DepthTextureMode.Depth;
         }
     }
 
     void OnPostRender()
     {
         // assign a render texture to the velocity buffer
+        if (velocityBuffer != null)
+        {
+            RenderTexture.ReleaseTemporary(velocityBuffer);
+            velocityBuffer = null;        
+        }
         if (velocityBuffer == null)
         {
-            velocityBuffer = RenderTexture.GetTemporary(sceneCamera.pixelWidth, sceneCamera.pixelHeight, 16, RenderTextureFormat.RGFloat, RenderTextureReadWrite.Default, 1);
+            velocityBuffer = RenderTexture.GetTemporary(_camera.pixelWidth, _camera.pixelHeight, 16, RenderTextureFormat.RGFloat, RenderTextureReadWrite.Default, 1);
+            velocityBuffer.filterMode = FilterMode.Point;
+            velocityBuffer.wrapMode = TextureWrapMode.Clamp;
         }
 
-        Matrix4x4 currentViewMat = sceneCamera.worldToCameraMatrix;
-        Matrix4x4 currentProjectionMat = GL.GetGPUProjectionMatrix(sceneCamera.projectionMatrix, true);
-        Matrix4x4 currentProjectionMat_NoFlip = GL.GetGPUProjectionMatrix(sceneCamera.projectionMatrix, false);
+        Matrix4x4 currV = _camera.worldToCameraMatrix;
+        Matrix4x4 currP = GL.GetGPUProjectionMatrix(_camera.projectionMatrix, true);
+        Matrix4x4 currP_NoFlip = GL.GetGPUProjectionMatrix(_camera.projectionMatrix, false);
+        Matrix4x4 prevV = initParams ? currentViewMat : currV;
+
+        initParams = true;
+        projectionExtents = _camera.GetProjectionExtents(jitter.currentSample.x, jitter.currentSample.y);
+        currentViewMat = currV;
+        currentViewProjectionMat = currP * currV;
+        previousViewProjectionMat = currP * prevV;
+        previousViewProjectionMat_NoFlip = currP_NoFlip * prevV;
 
         RenderTexture activeRT = RenderTexture.active;
         RenderTexture.active = velocityBuffer;
@@ -56,18 +85,18 @@ public class VelocityBuffer : MonoBehaviour
         if (velocityTexture == null)
         {
             velocityTexture = new Material(velocityShader);
-        } else {
+        }
+        if (velocityTexture != null) 
+        {
             velocityTexture.hideFlags = HideFlags.DontSave; // object will not be saved to scene, will not be destroyed on new scene
         }
 
         // set uniforms
-        velocityTexture.SetMatrix("currentViewMat", previousViewMat);
-        velocityTexture.SetMatrix("currentViewProjectMat", currentProjectionMat * currentViewMat);
-        velocityTexture.SetMatrix("previousViewProjectMat", currentProjectionMat * previousViewMat);
-        velocityTexture.SetMatrix("previousViewProjectMat_NoFlip", currentProjectionMat_NoFlip * previousViewMat);
-        velocityTexture.SetVector("projectionExtents", sceneCamera.GetProjectionExtents(jitter.currentSample.x, jitter.currentSample.y));
-
-        previousViewMat = currentViewMat;
+        velocityTexture.SetVector("projectionExtents", projectionExtents);
+        velocityTexture.SetMatrix("currentViewMat", currentViewMat);
+        velocityTexture.SetMatrix("currentViewProjectMat", currentViewProjectionMat);
+        velocityTexture.SetMatrix("previousViewProjectMat", previousViewProjectionMat);
+        velocityTexture.SetMatrix("previousViewProjectMat_NoFlip", previousViewProjectionMat_NoFlip);
 
         velocityTexture.SetPass(0);
         DrawFullscreenQuad();

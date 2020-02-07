@@ -1,11 +1,12 @@
 using UnityEngine;
 
 [ExecuteInEditMode]
-[RequireComponent(typeof(Jitter), typeof(VelocityBuffer))]
+[RequireComponent(typeof(Camera), typeof(Jitter), typeof(VelocityBuffer))]
 public class TemporalReprojection : MonoBehaviour
 {
     private static RenderBuffer[] renderTargets = new RenderBuffer[2];
 
+    private Camera _camera;
     private Jitter jitter;
     private VelocityBuffer velocityBuffer;
 
@@ -18,10 +19,23 @@ public class TemporalReprojection : MonoBehaviour
     [Range(0.0f, 1.0f)] public float blendWeightMax = 0.95f;
 
     public bool showVelocity = false;
-    public float motionBlurStrength = 1.0f;
+    public bool showDepth = false;
+    public bool motionBlur = true;
+    public bool addNoise = true;
+    public bool clipHistory = true;
+
+    void Start()
+    {
+        _camera = Camera.main;
+        if (!_camera.enabled)
+        {
+            _camera.enabled = true;
+        }
+    }
 
     void Reset()
     {
+        _camera = GetComponent<Camera>();
         jitter = GetComponent<Jitter>();
         velocityBuffer = GetComponent<VelocityBuffer>();
     }
@@ -81,20 +95,53 @@ public class TemporalReprojection : MonoBehaviour
         currentJitter.y /= source.height;
         currentJitter.w /= source.height;
 
-        // set uniforms
+        // set uniforms and keywords
+        if (showVelocity)
+        {
+            reprojectionMaterial.EnableKeyword("SHOW_VELOCITY");
+        } else 
+        {
+            reprojectionMaterial.DisableKeyword("SHOW_VELOCITY");
+        };
+        if (showDepth)
+        {
+            reprojectionMaterial.EnableKeyword("SHOW_DEPTH");
+        }
+        else
+        {
+            reprojectionMaterial.DisableKeyword("SHOWDEPTH");
+        };
+        if (addNoise)
+        {
+            reprojectionMaterial.EnableKeyword("ADD_NOISE");
+        }
+        else
+        {
+            reprojectionMaterial.DisableKeyword("ADD_NOISE");
+        };
+        if (motionBlur)
+        {
+            reprojectionMaterial.EnableKeyword("MOTION_BLUR");
+        }
+        else
+        {
+            reprojectionMaterial.DisableKeyword("MOTION_BLUR");
+        };
+        if (clipHistory)
+        {
+            reprojectionMaterial.EnableKeyword("CLIP_HISTORY");
+        }
+        else
+        {
+            reprojectionMaterial.DisableKeyword("CLIP_HISTORY");
+        };
+
         reprojectionMaterial.SetTexture("mainTexture", source);
         reprojectionMaterial.SetTexture("historyTexture", reprojectionBuffer[readIndex]);
         reprojectionMaterial.SetTexture("velocityBuffer", velocityBuffer.activeVelocityBuffer);
         reprojectionMaterial.SetVector("jitter", currentJitter);
         reprojectionMaterial.SetFloat("blendWeightMin", blendWeightMin);
         reprojectionMaterial.SetFloat("blendWeightMax", blendWeightMax);
-        reprojectionMaterial.SetFloat("motionBlurStrength", motionBlurStrength);
-        if(showVelocity)
-        {
-            reprojectionMaterial.EnableKeyword("SHOW_VELOCITY");
-        } else {
-            reprojectionMaterial.DisableKeyword("SHOW_VELOCITY");
-        }
 
         // copy to history buffer
         renderTargets[0] = reprojectionBuffer[writeIndex].colorBuffer;
@@ -141,7 +188,7 @@ public class TemporalReprojection : MonoBehaviour
     /// PlayDeadGames, Lasse Jon Fuglsang Pedersen (31 March, 2017). Temporal Reprojection Anti-Aliasing for Unity 5.0+.
     /// [Accessed 2019]. Available from: "https://github.com/playdeadgames/temporal/blob/master/Assets/Scripts/EffectBase.cs".
 
-    public void DrawFullscreenQuad()
+    void DrawFullscreenQuad()
     {
         GL.PushMatrix();
         GL.LoadOrtho();

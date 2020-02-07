@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-
+[ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
 public class Jitter : MonoBehaviour {
 
